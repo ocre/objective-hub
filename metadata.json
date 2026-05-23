@@ -1,0 +1,6 @@
+{
+  "name": "Todo List",
+  "description": "A elegant high-fidelity todo application featuring priority organization, visual tags, filtering, and local persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
