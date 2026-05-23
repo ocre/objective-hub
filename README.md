@@ -4,6 +4,14 @@ A sleek, robust, serverless React and TypeScript target & task organization syst
 
 ---
 
+## Snapshots
+![PC](./snapshots/snapshot-pc.png)
+
+![Mobile](./snapshots/snapshot-mobile.png)
+
+![Tablet](./snapshots/snapshot-tablet.png)
+
+
 ## 🌟 Core Features
 
 - **Multilingual Support (中英文双语)**: Switch instantly between English and Chinese with a fully localized interface. The translation selector is located inside the top-right Configuration Panel.
