@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Priority, Todo, Category } from '../types';
-import { Plus, Calendar, Tag, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import { Plus, Calendar, Tag, ChevronDown, ChevronUp, AlertCircle, Bell } from 'lucide-react';
 import { priorityColorMap, categoryColorMap } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Locale, getCategoryName } from '../translations';
 
 interface TodoFormProps {
   categories: Category[];
-  onAddTodo: (todo: Omit<Todo, 'id' | 'completed' | 'createdAt'>) => void;
+  onAddTodo: (todo: Omit<Todo, 'id' | 'completed' | 'createdAt' | 'archived'>) => void;
   onAddCategory: (name: string, color: string) => void;
   locale: Locale;
 }
@@ -19,6 +19,7 @@ export function TodoForm({ categories, onAddTodo, onAddCategory, locale }: TodoF
   const [priority, setPriority] = useState<Priority>(Priority.Medium);
   const [category, setCategory] = useState(categories[0]?.id || 'work');
   const [dueDate, setDueDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('');
   
   // Custom Category adding inline state
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -42,7 +43,8 @@ export function TodoForm({ categories, onAddTodo, onAddCategory, locale }: TodoF
       description: description.trim() || undefined,
       priority,
       category,
-      dueDate: dueDate || undefined
+      dueDate: dueDate || undefined,
+      reminderTime: reminderTime || undefined
     });
 
     // Reset standard form parts
@@ -50,6 +52,7 @@ export function TodoForm({ categories, onAddTodo, onAddCategory, locale }: TodoF
     setDescription('');
     setPriority(Priority.Medium);
     setDueDate('');
+    setReminderTime('');
     setShowDetails(false);
   };
 
@@ -181,6 +184,20 @@ export function TodoForm({ categories, onAddTodo, onAddCategory, locale }: TodoF
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
+                className="px-3 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all cursor-pointer"
+              />
+            </div>
+
+            {/* Reminder Time Picker */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <Bell size={10} /> {t.reminderLabel}
+              </span>
+              <input
+                id="reminder-time-form-picker"
+                type="datetime-local"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
                 className="px-3 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all cursor-pointer"
               />
             </div>

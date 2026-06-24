@@ -69,6 +69,7 @@ const SAMPLE_TODOS: Todo[] = [
     description: 'Prepare detailed finance charts',
     priority: Priority.High,
     completed: false,
+    archived: false,
     dueDate: '2026-06-01',
     category: 'work',
     createdAt: 1000
@@ -79,6 +80,7 @@ const SAMPLE_TODOS: Todo[] = [
     description: 'Milk, Eggs, Bread and some salad greens',
     priority: Priority.Low,
     completed: true,
+    archived: true,
     dueDate: '2026-05-24',
     category: 'shopping',
     createdAt: 2000
@@ -88,6 +90,7 @@ const SAMPLE_TODOS: Todo[] = [
     text: 'Evening Gym Session',
     priority: Priority.Medium,
     completed: false,
+    archived: false,
     // No due date
     category: 'health',
     createdAt: 3000
@@ -98,6 +101,7 @@ const SAMPLE_TODOS: Todo[] = [
     description: 'Notes on product design details',
     priority: Priority.High,
     completed: true,
+    archived: true,
     dueDate: '2026-05-31',
     category: 'ideas',
     createdAt: 1500

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isOverdue, formatDueDate } from '../utils';
+import { isOverdue, formatDueDate, formatCreateDate } from '../utils';
 
 describe('Todo Utility Functions', () => {
   describe('isOverdue', () => {
@@ -94,6 +94,21 @@ describe('Todo Utility Functions', () => {
       const result = formatDueDate(farFutureStr, 'zh');
       
       expect(result).toBe('2030年8月25日');
+    });
+  });
+
+  describe('formatCreateDate', () => {
+    it('should format timestamps correctly as yyyy-MM-dd', () => {
+      // 2026-05-23T12:00:00Z is 1779537600000
+      const date = new Date('2026-05-23T12:00:00Z');
+      const timestamp = date.getTime();
+      // Since new Date(timestamp) respects local timezone, we'll verify using local values dynamically
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const expected = `${year}-${month}-${day}`;
+
+      expect(formatCreateDate(timestamp)).toBe(expected);
     });
   });
 });

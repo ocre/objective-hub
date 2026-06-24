@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Todo, Priority, Category } from '../types';
-import { priorityColorMap, categoryColorMap, formatDueDate, isOverdue } from '../utils';
-import { Trash2, Edit2, Check, X, Calendar, AlertTriangle, ChevronDown, ChevronUp, Tag } from 'lucide-react';
+import { priorityColorMap, categoryColorMap, formatDueDate, isOverdue, formatCreateDate } from '../utils';
+import { Trash2, Edit2, Check, X, Calendar, AlertTriangle, ChevronDown, ChevronUp, Tag, Bell } from 'lucide-react';
 import { motion } from 'motion/react';
 import { translations, Locale, getCategoryName } from '../translations';
 
@@ -26,6 +26,7 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
   const [editPriority, setEditPriority] = useState<Priority>(todo.priority);
   const [editCategory, setEditCategory] = useState(todo.category);
   const [editDueDate, setEditDueDate] = useState(todo.dueDate || '');
+  const [editReminderTime, setEditReminderTime] = useState(todo.reminderTime || '');
 
   const handleSave = () => {
     if (!editText.trim()) return;
@@ -35,7 +36,8 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
       description: editDesc.trim() || undefined,
       priority: editPriority,
       category: editCategory,
-      dueDate: editDueDate || undefined
+      dueDate: editDueDate || undefined,
+      reminderTime: editReminderTime || undefined
     });
     setIsEditing(false);
   };
@@ -46,6 +48,7 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
     setEditPriority(todo.priority);
     setEditCategory(todo.category);
     setEditDueDate(todo.dueDate || '');
+    setEditReminderTime(todo.reminderTime || '');
     setIsEditing(false);
   };
 
@@ -85,11 +88,14 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
           {!isEditing && (
             <button
               type="button"
-              onClick={handleToggle}
-              className={`mt-1 flex items-center justify-center w-5 h-5 rounded-md border transition-all cursor-pointer ${
-                todo.completed
-                  ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600'
-                  : 'bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500'
+              onClick={todo.archived ? undefined : handleToggle}
+              disabled={todo.archived}
+              className={`mt-1 flex items-center justify-center w-5 h-5 rounded-md border transition-all ${
+                todo.archived
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 cursor-not-allowed'
+                  : todo.completed
+                    ? 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 cursor-pointer'
+                    : 'bg-white dark:bg-slate-950 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 cursor-pointer'
               }`}
             >
               {todo.completed && <Check size={12} className="stroke-[3]" />}
@@ -166,6 +172,18 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
                     className="px-2 py-0.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 cursor-pointer"
                   />
                 </div>
+
+                {/* Edit Reminder Time */}
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[9px] font-mono text-slate-400 uppercase">{t.reminderLabel}</span>
+                  <input
+                    id={`edit-reminder-time-field-${todo.id}`}
+                    type="datetime-local"
+                    value={editReminderTime}
+                    onChange={(e) => setEditReminderTime(e.target.value)}
+                    className="px-2 py-0.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 cursor-pointer"
+                  />
+                </div>
               </div>
             </div>
           ) : (
@@ -189,6 +207,12 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
                     {todo.priority === Priority.Low ? t.lowPrior : todo.priority === Priority.Medium ? t.medPrior : t.highPrior}
                   </span>
 
+                  {/* Create Date Indicator */}
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-medium flex items-center gap-1 border bg-slate-50 border-slate-100 text-slate-500 dark:bg-slate-950/40 dark:border-slate-800/60" id={`create-date-${todo.id}`}>
+                    <span className="text-slate-400 font-mono text-[9px] uppercase">{t.createdDate}:</span>
+                    <span className="font-mono">{formatCreateDate(todo.createdAt)}</span>
+                  </span>
+
                   {/* Category Badge */}
                   {currentCategoryObj && (
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium border flex items-center gap-1 ${tagColor.bg} ${tagColor.text} ${tagColor.border}`}>
@@ -207,6 +231,15 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
                       {isExpired ? <AlertTriangle size={10} className="text-rose-500" /> : <Calendar size={10} />}
                       <span>{formatDueDate(todo.dueDate, locale)}</span>
                       {isExpired && <span className="font-bold underline ml-0.5 uppercase tracking-wide">{t.overdue}</span>}
+                    </span>
+                  )}
+
+                  {/* Reminder Time Indicator */}
+                  {todo.reminderTime && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-medium flex items-center gap-1 border bg-indigo-50/55 border-indigo-100/40 dark:bg-indigo-950/20 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                      <Bell size={10} className="text-indigo-500" />
+                      <span className="text-indigo-400/80 font-mono text-[9px] uppercase">{t.reminderBadge}:</span>
+                      <span className="font-mono">{todo.reminderTime.replace('T', ' ')}</span>
                     </span>
                   )}
                 </div>
@@ -259,6 +292,12 @@ export function TodoItem({ todo, categories, onToggleComplete, onUpdateTodo, onD
                   <X size={14} className="stroke-[2.5]" />
                 </button>
               </>
+            ) : todo.archived ? (
+              /* Show Archived Badge instead of Edit/Delete buttons */
+              <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 text-[10px] font-mono font-bold rounded-lg uppercase tracking-wider flex items-center gap-1.5 border border-slate-200 dark:border-slate-700 shadow-3xs" title={t.archivedDesc}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{t.archivedBadge}</span>
+              </span>
             ) : (
               <>
                 <button

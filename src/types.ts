@@ -10,7 +10,9 @@ export interface Todo {
   description?: string;
   priority: Priority;
   completed: boolean;
+  archived: boolean;
   dueDate?: string;
+  reminderTime?: string; // ISO string format or 'YYYY-MM-DDTHH:mm'
   category: string;
   createdAt: number;
 }

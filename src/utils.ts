@@ -116,3 +116,15 @@ export function formatDueDate(dueDateString?: string, locale: Locale = 'en'): st
     });
   }
 }
+
+/**
+ * Formats a timestamp into a yyyy-MM-dd date string.
+ */
+export function formatCreateDate(timestamp: number): string {
+  const d = new Date(timestamp);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+

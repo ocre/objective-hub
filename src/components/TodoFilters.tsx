@@ -17,8 +17,6 @@ interface TodoFiltersProps {
   onCategoryChange: (category: string | 'all') => void;
   sortBy: string;
   onSortByChange: (sortBy: string) => void;
-  onClearCompleted: () => void;
-  completedCount: number;
   locale: Locale;
 }
 
@@ -34,8 +32,6 @@ export function TodoFilters({
   onCategoryChange,
   sortBy,
   onSortByChange,
-  onClearCompleted,
-  completedCount,
   locale
 }: TodoFiltersProps) {
   const t = translations[locale];
@@ -51,11 +47,11 @@ export function TodoFilters({
     { value: 'text-asc', label: t.sort_text_asc }
   ];
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || priorityFilter !== 'all' || categoryFilter !== 'all';
+  const hasActiveFilters = searchQuery !== '' || priorityFilter !== 'all' || categoryFilter !== 'all';
+  const hasAdvancedFilters = priorityFilter !== 'all' || categoryFilter !== 'all';
 
   const handleResetFilters = () => {
     onSearchChange('');
-    onStatusChange('all');
     onPriorityChange('all');
     onCategoryChange('all');
   };
@@ -100,7 +96,7 @@ export function TodoFilters({
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
             className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-              showAdvanced || hasActiveFilters
+              showAdvanced || hasAdvancedFilters
                 ? 'bg-indigo-50 border-indigo-100 text-indigo-600 dark:bg-indigo-950/20 dark:border-indigo-900/40 dark:text-indigo-400'
                 : 'bg-slate-50/55 border-slate-100 dark:border-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
@@ -150,23 +146,12 @@ export function TodoFilters({
               <span>{t.resetParamsBtn}</span>
             </button>
           )}
-
-          {completedCount > 0 && (
-            <button
-              type="button"
-              onClick={onClearCompleted}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-rose-200 dark:border-rose-950/40 text-xs font-medium text-rose-600 hover:text-white hover:bg-rose-500 hover:border-transparent dark:text-rose-400 dark:hover:bg-rose-950/50 transition-all cursor-pointer"
-            >
-              <Trash2 size={12} />
-              <span>{t.purgeCompletedBtn.replace('{count}', String(completedCount))}</span>
-            </button>
-          )}
         </div>
       </div>
 
       {/* Advanced Filters Panel */}
       <AnimatePresence>
-        {(showAdvanced || hasActiveFilters) && (
+        {showAdvanced && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}

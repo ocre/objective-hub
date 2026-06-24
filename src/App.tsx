@@ -5,7 +5,7 @@ import { TodoStats } from './components/TodoStats';
 import { TodoForm } from './components/TodoForm';
 import { TodoFilters } from './components/TodoFilters';
 import { TodoList } from './components/TodoList';
-import { Download, Upload, ClipboardList, Settings, Sparkles, CheckSquare, Globe } from 'lucide-react';
+import { Download, Upload, ClipboardList, Settings, Sparkles, CheckSquare, Globe, Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { translations, Locale } from './translations';
 
@@ -16,6 +16,7 @@ const INITIAL_TODOS: Todo[] = [
     description: 'Establish core target indicators for our key metrics and prepare brief summaries of findings.',
     priority: Priority.High,
     completed: false,
+    archived: false,
     dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
     category: 'work',
     createdAt: Date.now() - 3600000
@@ -26,6 +27,7 @@ const INITIAL_TODOS: Todo[] = [
     description: 'Double check charging capacity works fine with 65W smart dual adapters.',
     priority: Priority.Medium,
     completed: false,
+    archived: false,
     category: 'shopping',
     createdAt: Date.now() - 7200000
   },
@@ -35,6 +37,7 @@ const INITIAL_TODOS: Todo[] = [
     description: 'Aim for a 30-minute light routine to track targets on wearable logs.',
     priority: Priority.Low,
     completed: true,
+    archived: true,
     category: 'health',
     createdAt: Date.now() - 86400000
   }
@@ -52,7 +55,14 @@ export default function App() {
     const stored = localStorage.getItem(STORAGE_KEYS.TODOS);
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          return parsed.map((todo: any) => ({
+            ...todo,
+            archived: todo.archived ?? todo.completed ?? false
+          }));
+        }
+        return parsed;
       } catch (e) {
         console.error('Failed to parse stored todos', e);
       }
@@ -75,7 +85,7 @@ export default function App() {
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
   const [sortBy, setSortBy] = useState('created-desc');
@@ -84,12 +94,28 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [snoozeMinutes, setSnoozeMinutes] = useState<number>(() => {
+    const stored = localStorage.getItem('applet_snooze_minutes');
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return 10;
+  });
+
   const t = translations[locale];
 
   // Save active language selection
   useEffect(() => {
     localStorage.setItem('applet_locale', locale);
   }, [locale]);
+
+  // Synchronize snooze duration to localStorage
+  useEffect(() => {
+    localStorage.setItem('applet_snooze_minutes', String(snoozeMinutes));
+  }, [snoozeMinutes]);
 
   // Synchronize todos to localstorage
   useEffect(() => {
@@ -101,12 +127,94 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
   }, [categories]);
 
+  // Notification states & hooks
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
+
+  const [notifiedTaskIds, setNotifiedTaskIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('applet_notified_tasks');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [activeReminders, setActiveReminders] = useState<Array<{ id: string; text: string; time: string }>>([]);
+
+  useEffect(() => {
+    localStorage.setItem('applet_notified_tasks', JSON.stringify(notifiedTaskIds));
+  }, [notifiedTaskIds]);
+
+  const requestNotificationPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const permission = await Notification.requestPermission();
+        setNotificationPermission(permission);
+      } catch (err) {
+        console.warn('Could not request notification permission:', err);
+      }
+    }
+  };
+
+  const handleDismissReminder = (id: string) => {
+    setActiveReminders((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  // Notification check effect
+  useEffect(() => {
+    const checkReminders = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const currentLocalTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+      todos.forEach((todo) => {
+        if (todo.reminderTime && !todo.completed && !todo.archived) {
+          if (todo.reminderTime <= currentLocalTimeStr && !notifiedTaskIds.includes(todo.id)) {
+            // 1. Browser Notification
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              try {
+                new Notification(t.notificationTitle || 'Task Reminder', {
+                  body: todo.text,
+                });
+              } catch (e) {
+                console.error('Failed to trigger browser notification', e);
+              }
+            }
+
+            // 2. In-app toast notification
+            setActiveReminders((prev) => [
+              ...prev,
+              { id: todo.id, text: todo.text, time: todo.reminderTime }
+            ]);
+
+            // 3. Mark as notified
+            setNotifiedTaskIds((prev) => [...prev, todo.id]);
+          }
+        }
+      });
+    };
+
+    checkReminders();
+    const interval = setInterval(checkReminders, 10000);
+    return () => clearInterval(interval);
+  }, [todos, notifiedTaskIds, t.notificationTitle]);
+
   // Create new Todo
-  const handleAddTodo = (newTodoData: Omit<Todo, 'id' | 'completed' | 'createdAt'>) => {
+  const handleAddTodo = (newTodoData: Omit<Todo, 'id' | 'completed' | 'createdAt' | 'archived'>) => {
     const newTodo: Todo = {
       ...newTodoData,
       id: `task-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       completed: false,
+      archived: false,
       createdAt: Date.now()
     };
     setTodos((prev) => [newTodo, ...prev]);
@@ -124,7 +232,17 @@ export default function App() {
   // Toggle Complete / Pending state
   const handleToggleComplete = (id: string) => {
     setTodos((prev) =>
-      prev.map((todo) => (todo.id === id ? { ...todo, completed: !todo.completed } : todo))
+      prev.map((todo) => {
+        if (todo.id === id) {
+          const nextCompleted = !todo.completed;
+          return {
+            ...todo,
+            completed: nextCompleted,
+            archived: nextCompleted ? true : todo.archived
+          };
+        }
+        return todo;
+      })
     );
   };
 
@@ -135,14 +253,24 @@ export default function App() {
     );
   };
 
+  const handleSnoozeReminder = (id: string) => {
+    const now = new Date();
+    const snoozeTime = new Date(now.getTime() + snoozeMinutes * 60 * 1000);
+    const year = snoozeTime.getFullYear();
+    const month = String(snoozeTime.getMonth() + 1).padStart(2, '0');
+    const day = String(snoozeTime.getDate()).padStart(2, '0');
+    const hours = String(snoozeTime.getHours()).padStart(2, '0');
+    const minutes = String(snoozeTime.getMinutes()).padStart(2, '0');
+    const snoozeTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    handleUpdateTodo(id, { reminderTime: snoozeTimeStr });
+    setNotifiedTaskIds((prev) => prev.filter((taskId) => taskId !== id));
+    setActiveReminders((prev) => prev.filter((r) => r.id !== id));
+  };
+
   // Delete Todo item
   const handleDeleteTodo = (id: string) => {
     setTodos((prev) => prev.filter((todo) => todo.id !== id));
-  };
-
-  // Purge/Clear completed items
-  const handleClearCompleted = () => {
-    setTodos((prev) => prev.filter((todo) => !todo.completed));
   };
 
   // Backup Export
@@ -238,8 +366,6 @@ export default function App() {
     }
   });
 
-  const mainCompletedCount = todos.filter((todoItem) => todoItem.completed).length;
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans transition-colors duration-200">
       
@@ -332,7 +458,7 @@ export default function App() {
 
                 <div className="border-t border-slate-100/60 dark:border-slate-800/40" />
 
-                {/* Language Switch Section */}
+                 {/* Language Switch Section */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">{t.languageLabel}</h4>
@@ -350,6 +476,80 @@ export default function App() {
                     <Globe size={13} className="text-indigo-500" />
                     <span>{t.switchLangBtn}</span>
                   </button>
+                </div>
+
+                <div className="border-t border-slate-100/60 dark:border-slate-800/40" />
+
+                {/* Notification Settings Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">{t.notificationsSupported}</h4>
+                    <p className="text-xs text-slate-500">
+                      {locale === 'en' 
+                        ? 'Permit the browser to notify you when task reminders are triggered.'
+                        : '允许浏览器在触发任务提醒时发送桌面系统通知。'}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={requestNotificationPermission}
+                    className={`px-4 py-2 border rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer ${
+                      notificationPermission === 'granted'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                        : notificationPermission === 'denied'
+                          ? 'bg-rose-50 border-rose-200 text-rose-600 cursor-not-allowed'
+                          : 'bg-indigo-50 border-indigo-150 text-indigo-600 hover:bg-indigo-100'
+                    }`}
+                    disabled={notificationPermission === 'denied'}
+                  >
+                    <Bell size={13} className={notificationPermission === 'granted' ? 'text-emerald-500' : 'text-indigo-500'} />
+                    <span>
+                      {notificationPermission === 'granted'
+                        ? (locale === 'en' ? 'Notifications Active' : '通知已启用')
+                        : notificationPermission === 'denied'
+                          ? (locale === 'en' ? 'Notifications Blocked' : '通知已被屏蔽')
+                          : t.enableNotifications}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="border-t border-slate-100/60 dark:border-slate-800/40" />
+
+                {/* Snooze Duration Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">{t.snoozeDurationLabel}</h4>
+                    <p className="text-xs text-slate-500">
+                      {t.snoozeDurationDesc}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="global-snooze-duration-input"
+                      type="number"
+                      min="1"
+                      max="1440"
+                      value={snoozeMinutes}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val) && val > 0) {
+                          setSnoozeMinutes(val);
+                        } else if (e.target.value === '') {
+                          // Allow empty temporarily while typing
+                          setSnoozeMinutes(0);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (snoozeMinutes < 1) setSnoozeMinutes(10);
+                      }}
+                      className="w-20 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                    />
+                    <span className="text-xs text-slate-500 font-medium">
+                      {t.minutesUnit}
+                    </span>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -385,8 +585,6 @@ export default function App() {
           onCategoryChange={setCategoryFilter}
           sortBy={sortBy}
           onSortByChange={setSortBy}
-          onClearCompleted={handleClearCompleted}
-          completedCount={mainCompletedCount}
           locale={locale}
         />
 
@@ -417,6 +615,60 @@ export default function App() {
         </footer>
 
       </main>
+
+      {/* Floating Active Reminders (Toasts) */}
+      <div className="fixed bottom-5 right-5 z-50 space-y-3 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {activeReminders.map((reminder) => (
+            <motion.div
+              key={reminder.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.2 } }}
+              className="pointer-events-auto bg-slate-900 text-white rounded-xl shadow-xl border border-slate-800 p-4 flex items-start gap-3 relative overflow-hidden backdrop-blur-md bg-opacity-95"
+            >
+              <div className="p-1.5 bg-indigo-600 rounded-lg text-white mt-0.5 animate-bounce">
+                <Bell size={16} className="fill-white" />
+              </div>
+              <div className="flex-1 min-w-0 pr-6">
+                <h5 className="text-xs font-mono font-bold uppercase tracking-wider text-indigo-400">
+                  {t.notificationTitle || 'Task Reminder'}
+                </h5>
+                <p className="text-sm font-semibold mt-1 leading-snug truncate">
+                  {reminder.text}
+                </p>
+                <p className="text-[10px] font-mono mt-1 text-slate-400">
+                  {reminder.time.replace('T', ' ')}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSnoozeReminder(reminder.id)}
+                    className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Bell size={10} />
+                    <span>{t.remindMeLater} ({snoozeMinutes}m)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissReminder(reminder.id)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {t.dismissBtn}
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDismissReminder(reminder.id)}
+                className="absolute right-2 top-2 p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
     </div>
   );
